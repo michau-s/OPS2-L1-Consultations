@@ -30,6 +30,8 @@ void msleep(int millisec);
 
 void child_work(knight_t knight, int readEnd, int* enemyPipes, int enemyNo)
 {
+    int aliveEnemies = enemyNo;
+
     // For random damage
     srand(getpid());
 
@@ -38,16 +40,20 @@ void child_work(knight_t knight, int readEnd, int* enemyPipes, int enemyNo)
     int res;
     char buf;
 
-    while (1)
+    int alive = 1;
+    while (alive && aliveEnemies > 0)
     {
         // Loop for taking damage
-        while (1)
+        while (alive && aliveEnemies > 0)
         {
             res = read(readEnd, &buf, 1);
 
             // End if transmission
             if (res == 0)
+            {
+                aliveEnemies = 0;
                 break;
+            }
             // We check for EAGAIN because of the nonblocking mode
             if (res == -1 && errno == EAGAIN)
             {
@@ -60,27 +66,47 @@ void child_work(knight_t knight, int readEnd, int* enemyPipes, int enemyNo)
             {
                 // We take damage
                 knight.HP -= buf;
+                if (knight.HP < 0)
+                {
+                    printf("%s dies\n", knight.name);
+                    alive = 0;
+                }
             }
         }
 
         // Loop for dealing damage
-        while (1)
+        while (alive && aliveEnemies > 0)
         {
-            int enemy = rand() % enemyNo;
+            int enemy = rand() % aliveEnemies;
             char damage = rand() % knight.attack;  // Char because we want to send one byte
 
             int res;
             if ((res = write(enemyPipes[2 * enemy + 1], &damage, 1)) == -1)
-                ERR("write");
+            {
+                if (errno == EPIPE)
+                {
+                    aliveEnemies--;
+                    int temp = enemyPipes[2 * enemy + 1];
+                    enemyPipes[2 * enemy + 1] = enemyPipes[2 * aliveEnemies + 1];
+                    enemyPipes[2 * aliveEnemies + 1] = temp;
+                    continue;
+                }
+                else
+                    ERR("write");
+            }
 
             if (damage == 0)
-                printf("%s, attacks his enemy, however he deflected\n", knight.name);
+                printf("%s [HP: %d], attacks his enemy, however he deflected\n", knight.name, knight.HP);
             if (damage >= 1 && damage <= 5)
-                printf("%s, goes to strike, he hit right and well\n", knight.name);
+                printf("%s [HP: %d], goes to strike, he hit right and well\n", knight.name, knight.HP);
             if (damage >= 6)
-                printf("%s, strikes a powerful blow, the shield he breaks and inflicts a big wound\n", knight.name);
+                printf("%s [HP: %d], strikes a powerful blow, the shield he breaks and inflicts a big wound\n",
+                       knight.name, knight.HP);
 
             msleep(rand() % 10 + 1);
+
+            // We break after each attack
+            break;
         }
     }
 
@@ -245,6 +271,9 @@ int main(int argc, char* argv[])
 {
     FILE* franci_f;
     FILE* saraceni_f;
+
+    // For Stage04
+    set_handler(SIG_IGN, SIGPIPE);
 
     if ((franci_f = fopen("franci.txt", "r")) == NULL)
     {
