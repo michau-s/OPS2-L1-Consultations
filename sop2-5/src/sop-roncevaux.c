@@ -17,6 +17,13 @@
 
 #define MAX_KNIGHT_NAME_LENGTH 20
 
+typedef struct knight_t
+{
+    char name[MAX_KNIGHT_NAME_LENGTH];
+    int HP;
+    int attack;
+} knight_t;
+
 int set_handler(void (*f)(int), int sig)
 {
     struct sigaction act = {0};
@@ -67,6 +74,53 @@ int count_descriptors()
 
 int main(int argc, char* argv[])
 {
+    FILE* franci_f;
+    FILE* saraceni_f;
+
+    if ((franci_f = fopen("franci.txt", "r")) == NULL)
+    {
+        printf("Franks have not arrived on the battlefield");
+        ERR("fopen");
+    }
+    if ((saraceni_f = fopen("saraceni.txt", "r")) == NULL)
+    {
+        printf("Saraceni have not arrived on the battlefield");
+        ERR("fopen");
+    }
+
+    int franciNo;
+    fscanf(franci_f, "%d", &franciNo);
+
+    int saraceniNo;
+    fscanf(saraceni_f, "%d", &saraceniNo);
+
+    knight_t* franci;
+    if ((franci = calloc(franciNo, sizeof(knight_t))) == NULL)
+        ERR("calloc");
+    knight_t* saraceni;
+    if ((saraceni = calloc(saraceniNo, sizeof(knight_t))) == NULL)
+        ERR("calloc");
+
+    for (int i = 0; i < franciNo; i++)
+    {
+        fscanf(franci_f, "%s %d %d", franci[i].name, &franci[i].HP, &franci[i].attack);
+        printf("I am Frankish knight %s,. I will serve my king with my %d HP and %d attack\n", franci[i].name,
+               franci[i].HP, franci[i].attack);
+    }
+
+    for (int i = 0; i < saraceniNo; i++)
+    {
+        fscanf(saraceni_f, "%s %d %d", saraceni[i].name, &saraceni[i].HP, &saraceni[i].attack);
+        printf("I am Spanish knight %s,. I will serve my king with my %d HP and %d attack\n", saraceni[i].name,
+               saraceni[i].HP, saraceni[i].attack);
+    }
+
+    fclose(saraceni_f);
+    fclose(franci_f);
+
+    free(franci);
+    free(saraceni);
+
     srand(time(NULL));
     printf("Opened descriptors: %d\n", count_descriptors());
 }
