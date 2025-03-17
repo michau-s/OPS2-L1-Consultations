@@ -26,8 +26,64 @@ typedef struct knight_t
 
 int count_descriptors();
 
+void msleep(int millisec);
+
 void child_work(knight_t knight, int readEnd, int* enemyPipes, int enemyNo)
 {
+    // For random damage
+    srand(getpid());
+
+    // Set readEnd to nonblocking mode
+    fcntl(readEnd, F_SETFL, O_NONBLOCK);
+    int res;
+    char buf;
+
+    while (1)
+    {
+        // Loop for taking damage
+        while (1)
+        {
+            res = read(readEnd, &buf, 1);
+
+            // End if transmission
+            if (res == 0)
+                break;
+            // We check for EAGAIN because of the nonblocking mode
+            if (res == -1 && errno == EAGAIN)
+            {
+                // There's nothing to read, we want to start dealing damage
+                break;
+            }
+            else if (res == -1)
+                ERR("read");
+            if (res == 1)
+            {
+                // We take damage
+                knight.HP -= buf;
+            }
+        }
+
+        // Loop for dealing damage
+        while (1)
+        {
+            int enemy = rand() % enemyNo;
+            char damage = rand() % knight.attack;  // Char because we want to send one byte
+
+            int res;
+            if ((res = write(enemyPipes[2 * enemy + 1], &damage, 1)) == -1)
+                ERR("write");
+
+            if (damage == 0)
+                printf("%s, attacks his enemy, however he deflected\n", knight.name);
+            if (damage >= 1 && damage <= 5)
+                printf("%s, goes to strike, he hit right and well\n", knight.name);
+            if (damage >= 6)
+                printf("%s, strikes a powerful blow, the shield he breaks and inflicts a big wound\n", knight.name);
+
+            msleep(rand() % 10 + 1);
+        }
+    }
+
     // Closing the pipes
     close(readEnd);
     for (int i = 0; i < enemyNo; i++)
